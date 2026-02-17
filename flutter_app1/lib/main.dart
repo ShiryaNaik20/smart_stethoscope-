@@ -1,172 +1,285 @@
 import 'package:flutter/material.dart';
-import 'heart_model1.dart';
-import 'waveform_painter.dart';
+import 'screens/recording_screen.dart';
+import 'screens/reports_screen.dart';
+import 'screens/patient_details_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const SmartStethoscopeApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class SmartStethoscopeApp extends StatelessWidget {
+  const SmartStethoscopeApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: ModelTestScreen(),
+      title: 'Smart Stethoscope',
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1565C0),
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF4F6FA),
+
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1565C0),
+          elevation: 2,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          iconTheme: IconThemeData(color: Colors.white),
+        ),
+
+        // ✅ FIXED HERE (CardThemeData instead of CardTheme)
+        cardTheme: CardThemeData(
+          elevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ),
+
+        snackBarTheme: const SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+        ),
+      ),
+      home: const SplashScreen(),
     );
   }
 }
 
-class ModelTestScreen extends StatefulWidget {
-  const ModelTestScreen({super.key});
+////////////////////////////////////////////////////////////
+/// SPLASH SCREEN
+////////////////////////////////////////////////////////////
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
 
   @override
-  State<ModelTestScreen> createState() => _ModelTestScreenState();
+  State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _ModelTestScreenState extends State<ModelTestScreen> {
-  final HeartModel model = HeartModel();
-  String results = "Press button to test CNN model";
-
-  String? selectedFile;
-  List<double> waveformSamples = [];
-
-  final List<String> files = [
-    "b0028",
-    "b0030",
-    "b0141",
-    "b0144",
-    "b0174",
-  ];
-
+class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    model.loadModel();
-  }
 
-  Future<void> testModel() async {
-    String outputText = "";
-
-    for (String file in files) {
-      var mfcc = await model.loadMFCC(file);
-      var prediction = model.predict(mfcc);
-
-      double normalProb = prediction[0];
-      double abnormalProb = prediction[1];
-
-      String label;
-      double confidence;
-
-      if (normalProb > abnormalProb) {
-        label = "Normal";
-        confidence = normalProb;
-      } else {
-        label = "Abnormal";
-        confidence = abnormalProb;
-      }
-
-      outputText += "File: $file\nResult: $label\nConfidence: ${(confidence*100).toStringAsFixed(2)}%\n\n";
-    }
-
-    setState(() {
-      results = outputText;
+    Future.delayed(const Duration(seconds: 3), () {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
     });
-  }
-
-  Future<void> _showWaveform(String fileName) async {
-    var mfcc = await model.loadMFCC(fileName);
-
-    // Convert 2D MFCC [216,40] to 1D samples
-    waveformSamples = mfcc
-        .map((frame) => frame.reduce((a, b) => a + b) / frame.length)
-        .toList();
-
-    setState(() {
-      selectedFile = fileName;
-    });
-  }
-
-  @override
-  void dispose() {
-    model.close();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Smart Stethoscope CNN Test")),
-      body: Padding(
-        padding: const EdgeInsets.all(12),
+    return const Scaffold(
+      backgroundColor: Color(0xFF1565C0),
+      body: Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ElevatedButton(
-              onPressed: testModel,
-              child: const Text("Run CNN Model Test"),
+            Icon(Icons.monitor_heart, color: Colors.white, size: 90),
+            SizedBox(height: 20),
+            Text(
+              "Smart Stethoscope",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: SingleChildScrollView(
+            SizedBox(height: 10),
+            Text(
+              "AI Health Monitoring",
+              style: TextStyle(color: Colors.white70),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+////////////////////////////////////////////////////////////
+/// HOME SCREEN
+////////////////////////////////////////////////////////////
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Smart Stethoscope"),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 20),
+
+            const Text(
+              "Dashboard",
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            /// Dashboard Card
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Waveform buttons
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: files.map((file) {
-                        return ElevatedButton(
-                          onPressed: () => _showWaveform(file),
-                          child: Text("Show $file waveform"),
-                        );
-                      }).toList(),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Row(
+                      children: [
+                        Icon(Icons.bluetooth, color: Colors.blue),
+                        SizedBox(width: 8),
+                        Text("Device Status: Connected",
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                      ],
                     ),
-                    const SizedBox(height: 20),
-
-                    // Waveform graph
-                    if (selectedFile != null)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Waveform for $selectedFile",
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            height: 250,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: CustomPaint(
-                              painter: WaveformPainter(waveformSamples),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                    const SizedBox(height: 20),
-
-                    // Results
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(8),
-                        color: Colors.grey.shade100,
-                      ),
-                      child: SelectableText(
-                        results,
-                        style: const TextStyle(fontSize: 16),
-                      ),
+                    SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Icon(Icons.access_time, color: Colors.orange),
+                        SizedBox(width: 8),
+                        Text("Last Scan: Today"),
+                      ],
+                    ),
+                    SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Icon(Icons.smart_toy, color: Colors.green),
+                        SizedBox(width: 8),
+                        Text("AI Status: Active"),
+                      ],
                     ),
                   ],
                 ),
+              ),
+            ),
+
+            const SizedBox(height: 35),
+
+            buildModernButton(
+              context,
+              "Connect Device",
+              Icons.bluetooth,
+              () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Device Connected (Demo Mode)"),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            buildModernButton(
+              context,
+              "Record Heart Sound",
+              Icons.favorite,
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const PatientDetailsScreen(mode: "Heart"),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            buildModernButton(
+              context,
+              "Record Lung Sound",
+              Icons.air,
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const PatientDetailsScreen(mode: "Lung"),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            buildModernButton(
+              context,
+              "View Reports",
+              Icons.description,
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ReportsScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  ////////////////////////////////////////////////////////////
+  /// MODERN BUTTON
+  ////////////////////////////////////////////////////////////
+
+  Widget buildModernButton(
+    BuildContext context,
+    String text,
+    IconData icon,
+    VoidCallback onPressed,
+  ) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        width: double.infinity,
+        height: 65,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1976D2), Color(0xFF42A5F5)],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blueAccent.withOpacity(0.25),
+              blurRadius: 10,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 12),
+            Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
