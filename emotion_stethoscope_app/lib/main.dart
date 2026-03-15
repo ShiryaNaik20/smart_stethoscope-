@@ -1,147 +1,223 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/io.dart';
-import 'package:web_socket_channel/status.dart' as status;
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-void main() => runApp(MyApp());
+void main() {
+  runApp(MyApp());
+}
 
 class MyApp extends StatefulWidget {
   @override
-  _MyAppState createState() => _MyAppState();
+  State<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
+
   IOWebSocketChannel? channel;
-  bool isConnected = false;
+
+  bool connected = false;
 
   List<double> samples = [];
+  List<double> recordedSamples = [];
 
-  void connectToESP32() {
-    try {
-      channel = IOWebSocketChannel.connect(
-        'ws://192.168.1.100:81', // 🔴 CHANGE THIS TO YOUR ESP32 IP
-      );
+  bool recording = false;
 
-      channel!.stream.listen(
-        (message) {
-          Uint8List bytes = message;
+  String result = "No Prediction";
 
-          final int16List = Int16List.view(bytes.buffer);
+  // CONNECT TO ESP32
+  void connectESP() {
 
-          final newSamples =
-              int16List.map((e) => e / 32768.0).toList();
+    channel = IOWebSocketChannel.connect(
+        "ws://192.168.0.105:81"   // CHANGE TO ESP32 IP
+    );
 
-          setState(() {
-            samples.addAll(newSamples);
+    channel!.stream.listen((message) {
 
-            if (samples.length > 1024) {
-              samples =
-                  samples.sublist(samples.length - 1024);
-            }
-          });
-        },
-        onDone: () {
-          setState(() {
-            isConnected = false;
-          });
-        },
-        onError: (error) {
-          setState(() {
-            isConnected = false;
-          });
-        },
-      );
+      Uint8List bytes = message;
+
+      final int16List = Int16List.view(bytes.buffer);
+
+      final newSamples =
+      int16List.map((e) => e / 32768.0).toList();
 
       setState(() {
-        isConnected = true;
+
+        samples.addAll(newSamples);
+
+        if (samples.length > 1024) {
+          samples = samples.sublist(samples.length - 1024);
+        }
+
+        if (recording) {
+          recordedSamples.addAll(newSamples);
+        }
+
       });
-    } catch (e) {
-      print("Connection Error: $e");
-    }
+
+    });
+
+    setState(() {
+      connected = true;
+    });
   }
 
-  void disconnect() {
-    channel?.sink.close(status.goingAway);
+  // RECORD 5 SECONDS
+  Future record5Seconds() async {
+
+    recordedSamples.clear();
+
+    recording = true;
+
+    await Future.delayed(Duration(seconds: 5));
+
+    recording = false;
+
+    sendToModel();
+  }
+
+  // CONVERT AUDIO BYTES
+  Uint8List convertBytes() {
+
+    final intSamples =
+    recordedSamples.map((e) => (e * 32767).toInt()).toList();
+
+    final buffer = Int16List.fromList(intSamples);
+
+    return buffer.buffer.asUint8List();
+  }
+
+  // SEND TO AI SERVER
+  Future sendToModel() async {
+
+    var audio = convertBytes();
+
+    var request = http.MultipartRequest(
+        'POST',
+        Uri.parse("http://10.209.26.118:5000/predict")   // YOUR PYTHON SERVER
+    );
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+          "audio",
+          audio,
+          filename: "heart.wav"
+      ),
+    );
+
+    var response = await request.send();
+
+    var body = await response.stream.bytesToString();
+
+    var data = jsonDecode(body);
+
     setState(() {
-      isConnected = false;
+      result = data["prediction"];
     });
   }
 
   @override
   Widget build(BuildContext context) {
+
     return MaterialApp(
+
       home: Scaffold(
-        appBar: AppBar(title: Text("ESP32 Heart Monitor")),
+
+        appBar: AppBar(
+          title: Text("AI Heart Detector"),
+        ),
+
         body: Column(
+
           children: [
+
             SizedBox(height: 20),
 
             Text(
-              isConnected ? "Connected ✅" : "Disconnected ❌",
-              style: TextStyle(
-                fontSize: 18,
-                color:
-                    isConnected ? Colors.green : Colors.red,
-              ),
+              connected ? "Connected ✅" : "Disconnected ❌",
+              style: TextStyle(fontSize: 20),
+            ),
+
+            ElevatedButton(
+              onPressed: connectESP,
+              child: Text("Connect ESP32"),
+            ),
+
+            ElevatedButton(
+              onPressed: record5Seconds,
+              child: Text("Record Heart Sound"),
             ),
 
             SizedBox(height: 20),
 
-            ElevatedButton(
-              onPressed:
-                  isConnected ? disconnect : connectToESP32,
-              child: Text(
-                  isConnected ? "Disconnect" : "Connect"),
+            Text(
+              "Prediction:",
+              style: TextStyle(fontSize: 18),
+            ),
+
+            Text(
+              result,
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold
+              ),
             ),
 
             SizedBox(height: 20),
 
             Expanded(
               child: CustomPaint(
-                painter: WaveformPainter(samples),
+                painter: WavePainter(samples),
                 size: Size(double.infinity, 200),
               ),
-            ),
+            )
+
           ],
+
         ),
+
       ),
+
     );
   }
 }
 
-class WaveformPainter extends CustomPainter {
+// WAVEFORM PAINTER
+class WavePainter extends CustomPainter {
+
   final List<double> samples;
 
-  WaveformPainter(this.samples);
+  WavePainter(this.samples);
 
   @override
   void paint(Canvas canvas, Size size) {
+
     final paint = Paint()
       ..color = Colors.blue
       ..strokeWidth = 2;
 
-    final middleY = size.height / 2;
-    final scaleX = size.width /
-        (samples.isEmpty ? 1 : samples.length);
+    final middle = size.height / 2;
+
+    final scaleX =
+        size.width / (samples.isEmpty ? 1 : samples.length);
 
     for (int i = 0; i < samples.length - 1; i++) {
+
       final x1 = i * scaleX;
-      final y1 = middleY - samples[i] * middleY;
+      final y1 = middle - samples[i] * middle;
 
       final x2 = (i + 1) * scaleX;
-      final y2 =
-          middleY - samples[i + 1] * middleY;
+      final y2 = middle - samples[i + 1] * middle;
 
       canvas.drawLine(
-        Offset(x1, y1),
-        Offset(x2, y2),
-        paint,
+          Offset(x1, y1),
+          Offset(x2, y2),
+          paint
       );
     }
   }
 
   @override
-  bool shouldRepaint(
-      covariant WaveformPainter oldDelegate) =>
-      true;
+  bool shouldRepaint(oldDelegate) => true;
 }

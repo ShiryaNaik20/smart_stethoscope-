@@ -19,7 +19,8 @@ dependencies:
   path_provider: ^2.1.2
   audio_waveforms: ^1.0.4
   tflite_flutter: ^0.12.1
-
+  http: ^0.13.6
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
