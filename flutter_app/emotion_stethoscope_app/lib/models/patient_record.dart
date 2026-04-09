@@ -9,6 +9,7 @@ class PatientRecord {
   final double confidence;
   final String? audioPath;
   final String timestamp;
+  final String mode; // ✅ ADDED: 'heart' or 'lung'
 
   PatientRecord({
     this.id,
@@ -21,6 +22,7 @@ class PatientRecord {
     required this.confidence,
     this.audioPath,
     required this.timestamp,
+    required this.mode, // ✅ ADDED
   });
 
   Map<String, dynamic> toMap() => {
@@ -31,8 +33,9 @@ class PatientRecord {
         'prediction': prediction,
         'murmur': murmur,
         'confidence': confidence,
-        'audio_path': audioPath, 
+        'audio_path': audioPath,
         'timestamp': timestamp,
+        'mode': mode, // ✅ ADDED
       };
 
   factory PatientRecord.fromMap(Map<String, dynamic> map) => PatientRecord(
@@ -46,5 +49,6 @@ class PatientRecord {
         confidence: map['confidence'],
         audioPath: map['audio_path'],
         timestamp: map['timestamp'],
+        mode: map['mode'] ?? 'heart', // ✅ ADDED: default to 'heart' for old records
       );
 }

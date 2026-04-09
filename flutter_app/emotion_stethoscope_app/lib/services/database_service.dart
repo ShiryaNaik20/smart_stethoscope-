@@ -18,7 +18,7 @@ class DatabaseService {
 
     return openDatabase(
       path,
-      version: 3, // ✅ UPDATED VERSION
+      version: 4, // ✅ UPDATED VERSION (was 3, now 4)
 
       // Create table (for fresh installs)
       onCreate: (db, version) async {
@@ -30,10 +30,11 @@ class DatabaseService {
             age        TEXT,
             phone      TEXT,
             prediction TEXT,
-            murmur TEXT,
+            murmur     TEXT,
             confidence REAL,
             audio_path TEXT,
-            timestamp  TEXT
+            timestamp  TEXT,
+            mode       TEXT
           )
         ''');
       },
@@ -46,16 +47,23 @@ class DatabaseService {
           );
         }
 
-          if (oldVersion < 3) {
-    await db.execute(
-      'ALTER TABLE records ADD COLUMN murmur TEXT'
-    );
-  }
+        if (oldVersion < 3) {
+          await db.execute(
+            'ALTER TABLE records ADD COLUMN murmur TEXT'
+          );
+        }
+
+        // ✅ NEW: Add mode column for version 4
+        if (oldVersion < 4) {
+          await db.execute(
+            'ALTER TABLE records ADD COLUMN mode TEXT DEFAULT "heart"'
+          );
+        }
       },
     );
   }
 
-  // ✅ NEW: Auto-generate patient ID
+  // ✅ Auto-generate patient ID
   static Future<int> getNextPatientId() async {
     final db = await database;
 

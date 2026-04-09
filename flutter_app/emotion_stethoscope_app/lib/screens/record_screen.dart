@@ -47,6 +47,9 @@ class _RecordScreenState extends State<RecordScreen>
   int  _samplesCollected = 0;
   String? _connectionError;
 
+  // ✅ NEW: Mode selector state ('heart' or 'lung')
+  String _selectedMode = 'heart';
+
   late final Ticker _ticker;
 
   @override
@@ -170,37 +173,58 @@ class _RecordScreenState extends State<RecordScreen>
               _rawBuffer.length - AppConfig.targetSamples)
           : List<int>.from(_rawBuffer);
 
-      final result = await _predService.predict(samples);
+      // ✅ UPDATED: Pass mode to prediction service
+      final result = await _predService.predict(samples, _selectedMode);
 
-      // ✅ SAVE WAV FILE (keep this)
+      // ✅ SAVE WAV FILE
       final wavPath = await _saveAsWav(samples);
-
-      // ❌ REMOVED DATABASE SAVE - Will be saved in ResultScreen when user clicks "Save"
-      // This was causing duplicate records
 
       _wsService.disconnect();
 
       if (!mounted) return;
 
-      // ✅ NAVIGATE TO RESULT SCREEN WITH AUDIO PATH
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ResultScreen(
-            patientId: widget.patientId,
-            name: widget.name,
-            age: widget.age,
-            phone: widget.phone,
-            // prediction: result['prediction'] ?? 'Unknown',
-            // confidence: (result['confidence'] ?? 0.0).toDouble(),
-            prediction: result['heart_prediction'] ?? 'Unknown',
-            confidence: (result['heart_score'] ?? 0.0).toDouble(),
-            murmur: result['murmur_prediction'] ?? 'Not Checked',
-            bpm: (result['bpm'] ?? 0.0).toDouble(),
-            audioPath: wavPath, // ✅ PASS THE WAV FILE PATH
+      // ✅ NAVIGATE TO RESULT SCREEN WITH MODE
+      if (_selectedMode == 'lung') {
+        // Lung mode - different result structure
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ResultScreen(
+              patientId: widget.patientId,
+              name: widget.name,
+              age: widget.age,
+              phone: widget.phone,
+              prediction: result['lung_prediction'] ?? 'Unknown',
+              confidence: (result['confidence'] ?? 0.0).toDouble(),
+              murmur: '', // No murmur for lung
+              bpm: 0.0, // No BPM for lung
+              audioPath: wavPath,
+              mode: _selectedMode, // ✅ Pass mode
+              lungClass: result['lung_class'] ?? 'Unknown', // ✅ Pass lung class
+            ),
           ),
-        ),
-      );
+        );
+      } else {
+        // Heart mode - existing structure
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ResultScreen(
+              patientId: widget.patientId,
+              name: widget.name,
+              age: widget.age,
+              phone: widget.phone,
+              prediction: result['heart_prediction'] ?? 'Unknown',
+              confidence: (result['heart_score'] ?? 0.0).toDouble(),
+              murmur: result['murmur_prediction'] ?? 'Not Checked',
+              bpm: (result['bpm'] ?? 0.0).toDouble(),
+              audioPath: wavPath,
+              mode: _selectedMode, // ✅ Pass mode
+              lungClass: '', // ✅ Empty for heart mode
+            ),
+          ),
+        );
+      }
     } catch (e) {
       setState(() => _isPredicting = false);
       _showSnack("Error: $e", isError: true);
@@ -245,6 +269,95 @@ class _RecordScreenState extends State<RecordScreen>
                   const Text(
                     "Recording...",
                     style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ✅ NEW: MODE SELECTOR
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedMode = 'heart'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _selectedMode == 'heart'
+                                    ? Colors.red.shade400
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.favorite,
+                                    color: _selectedMode == 'heart'
+                                        ? Colors.white
+                                        : Colors.grey.shade600,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Heart',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: _selectedMode == 'heart'
+                                          ? Colors.white
+                                          : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedMode = 'lung'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _selectedMode == 'lung'
+                                    ? Colors.blue.shade400
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.air,
+                                    color: _selectedMode == 'lung'
+                                        ? Colors.white
+                                        : Colors.grey.shade600,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Lung',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: _selectedMode == 'lung'
+                                          ? Colors.white
+                                          : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
 
                   const SizedBox(height: 20),

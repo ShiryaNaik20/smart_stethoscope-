@@ -185,6 +185,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   final hasAudio = r.audioPath != null && 
                                       r.audioPath!.isNotEmpty;
                                   final isThisPlaying = _playingIndex == index;
+                                  // ✅ NEW: Check mode
+                                  final isLungMode = r.mode == 'lung';
 
                                   return Container(
                                     decoration: BoxDecoration(
@@ -208,22 +210,54 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                             ? Colors.red.shade100
                                             : Colors.green.shade100,
                                         child: Icon(
-                                          isAbnormal
-                                              ? Icons.warning_rounded
-                                              : Icons.check_circle_rounded,
+                                          // ✅ NEW: Different icon based on mode
+                                          isLungMode
+                                              ? Icons.air
+                                              : (isAbnormal
+                                                  ? Icons.warning_rounded
+                                                  : Icons.check_circle_rounded),
                                           color: isAbnormal
                                               ? Colors.red.shade700
                                               : Colors.green.shade700,
                                           size: 22,
                                         ),
                                       ),
-                                      title: Text(
-                                        r.name,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 15,
-                                          color: Colors.black87,
-                                        ),
+                                      title: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              r.name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 15,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                          ),
+                                          // ✅ NEW: Mode badge
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 3,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: isLungMode
+                                                  ? Colors.blue.shade100
+                                                  : Colors.red.shade100,
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              isLungMode ? 'LUNG' : 'HEART',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: isLungMode
+                                                    ? Colors.blue.shade700
+                                                    : Colors.red.shade700,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                       subtitle: Column(
                                         crossAxisAlignment:

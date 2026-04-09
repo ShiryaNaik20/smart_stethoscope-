@@ -10,7 +10,9 @@ class ResultScreen extends StatefulWidget {
   final double confidence;
   final double bpm;
   final String audioPath;
-  final String murmur; // ✅ ADDED
+  final String murmur;
+  final String mode; // ✅ ADDED: 'heart' or 'lung'
+  final String lungClass; // ✅ ADDED: For lung predictions (Normal, Crackle, Wheeze, Both)
 
   const ResultScreen({
     super.key,
@@ -21,8 +23,10 @@ class ResultScreen extends StatefulWidget {
     required this.prediction,
     required this.confidence,
     required this.bpm,
-    required this.audioPath, 
-    required this.murmur,// ✅ ADDED
+    required this.audioPath,
+    required this.murmur,
+    required this.mode, // ✅ ADDED
+    required this.lungClass, // ✅ ADDED
   });
 
   @override
@@ -36,6 +40,9 @@ class _ResultScreenState extends State<ResultScreen> {
   bool get _isAbnormal =>
       widget.prediction.toLowerCase().contains('abnormal');
 
+  // ✅ NEW: Check if mode is lung
+  bool get _isLungMode => widget.mode == 'lung';
+
   Future<void> _saveRecord() async {
     if (_saved) { _showSnack('Already saved!'); return; }
     setState(() => _saving = true);
@@ -48,8 +55,9 @@ class _ResultScreenState extends State<ResultScreen> {
         prediction: widget.prediction,
         murmur: widget.murmur,
         confidence: widget.confidence,
-        audioPath:  widget.audioPath, // ✅ ADDED - Save the WAV file path
+        audioPath:  widget.audioPath,
         timestamp:  DateTime.now().toIso8601String(),
+        mode: widget.mode, // ✅ ADDED: Save the mode
       );
       await DatabaseService.saveRecord(record);
       if (!mounted) return;
@@ -62,11 +70,19 @@ class _ResultScreenState extends State<ResultScreen> {
     }
   }
 
+  // void _goHome() => Navigator.pushAndRemoveUntil(
+  //       context,
+  //       MaterialPageRoute(builder: (_) => const LoginScreen()),
+  //       (_) => false,
+  //     );
+
   void _goHome() => Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (_) => false,
-      );
+  context,
+  MaterialPageRoute(
+    builder: (_) => LoginScreen(mode: 'medical'),
+  ),
+  (_) => false,
+);
 
   void _goHistory() => Navigator.push(
         context,
@@ -171,8 +187,54 @@ class _ResultScreenState extends State<ResultScreen> {
                                   ),
                                 ),
 
-                                // ── BPM badge ──────────────
-                                if (widget.bpm > 0) ...[
+                                // ✅ NEW: Show lung class if lung mode
+                                if (_isLungMode && widget.lungClass.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding:
+                                        const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius:
+                                          BorderRadius.circular(
+                                              20),
+                                      border: Border.all(
+                                        color: _isAbnormal
+                                            ? Colors.red.shade200
+                                            : Colors
+                                                .green.shade200,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize:
+                                          MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.air,
+                                          color: Colors
+                                              .blue.shade400,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          widget.lungClass,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight:
+                                                FontWeight.bold,
+                                            color: Colors
+                                                .black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+
+                                // ── BPM badge (only for heart) ──
+                                if (!_isLungMode && widget.bpm > 0) ...[
                                   const SizedBox(height: 12),
                                   Container(
                                     padding:
@@ -205,7 +267,7 @@ class _ResultScreenState extends State<ResultScreen> {
                                         const SizedBox(width: 6),
                                         Text(
                                           '${widget.bpm.toStringAsFixed(1)} BPM',
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             fontSize: 16,
                                             fontWeight:
                                                 FontWeight.bold,
@@ -232,20 +294,34 @@ class _ResultScreenState extends State<ResultScreen> {
                           _divider(),
                           _row('Phone', widget.phone),
                           _divider(),
+                          // ✅ NEW: Show mode type
+                          _row('Type', _isLungMode ? 'Lung Sound' : 'Heart Sound'),
+                          _divider(),
                           _row('Prediction', widget.prediction),
                           _divider(),
-                          _row('Murmur', widget.murmur.isEmpty ? 'Not Checked' : widget.murmur,),
+                          
+                          // ✅ CONDITIONAL: Show lung class OR murmur based on mode
+                          if (_isLungMode)
+                            _row('Lung Class', widget.lungClass.isEmpty ? 'Unknown' : widget.lungClass)
+                          else
+                            _row('Murmur', widget.murmur.isEmpty ? 'Not Checked' : widget.murmur),
                           _divider(),
+                          
                           _row('Confidence',
                               '${widget.confidence.toStringAsFixed(1)}%'),
                           _divider(),
-                          _row(
-                            'Heart Rate',
-                            widget.bpm > 0
-                                ? '${widget.bpm.toStringAsFixed(1)} BPM'
-                                : 'Not detected',
-                          ),
-                          _divider(),
+                          
+                          // ✅ CONDITIONAL: Only show BPM for heart mode
+                          if (!_isLungMode) ...[
+                            _row(
+                              'Heart Rate',
+                              widget.bpm > 0
+                                  ? '${widget.bpm.toStringAsFixed(1)} BPM'
+                                  : 'Not detected',
+                            ),
+                            _divider(),
+                          ],
+                          
                           _row('Date',
                               _formatDate(DateTime.now())),
 
